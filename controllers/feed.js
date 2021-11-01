@@ -1,25 +1,33 @@
-const { validationResult } = require('express-validator');
+const { validationResult } = require('express-validator/check');
 const Post = require('../models/post');
 const fs = require('fs');
 const path = require('path');
 
 exports.getPosts = (req, res, next) => {
-    Post.find()
+    const currentPage = req.query.page || 1;
+    const itemPerPage = 2;
+    let totalItems = 0;
+    Post.find().countDocuments()
+    .then(count => {
+        totalItems = count;
+        return Post.find()
+        .skip((currentPage - 1) * itemPerPage)
+        .limit(itemPerPage)
+    })
     .then(posts =>{
         res.status(200).json({
             message : 'Fetched posts successfully.', 
-            posts : posts
+            posts : posts,
+            totalItems : totalItems
         });
     })
     .catch(err =>{
-        throwError(err);
+        throwError(err)
     });
 }
 
-
 exports.createPost = (req, res, next) => {
     const errors = validationResult(req);
-
     if(!errors.isEmpty()){
         const error = new Error('Validation failed, entereddata is incorrect.');
         error.statusCode = 422;
@@ -32,9 +40,7 @@ exports.createPost = (req, res, next) => {
         
         throw error;
     }
-
     const imageUrl = req.file.path;
-
     const post  = new Post({
         title : req.body.title,
         content : req.body.content,
@@ -67,13 +73,12 @@ exports.getPost = (req, res, next) => {
     .catch(err => { 
         throwError(err);
     })
-};
+}
 
 exports.updatePost = (req, res, next) => {
     const postId = req.params.postId;
-    const title = req.body.postId;
-    const content = req.body.postId;
-    const imageUrl = req.body.image;
+    const title = req.body.title;
+    const content = req.body.content;
     const errors = validationResult(req);
 
     if(!errors.isEmpty()){
@@ -82,9 +87,11 @@ exports.updatePost = (req, res, next) => {
         
         throw error;
     }
+
     if(req.file){
         imageUrl = req.file.path;
     }
+
     if(!imageUrl){
         const error = new Error('no file picked.');
         error.statusCode = 402;
@@ -115,7 +122,7 @@ exports.updatePost = (req, res, next) => {
     .catch(err => { 
         throwError(err);
     })
-};
+}
 
 
 exports.deletePost = (req, res, next) => {
@@ -144,9 +151,9 @@ exports.deletePost = (req, res, next) => {
     .catch(err => { 
         throwError(err);
     })
-};
+}
 
-throwError = function (err) {
+function throwError(err) {
     if(!err.statusCode){
         err.statusCode = 500;
     }    
@@ -155,5 +162,6 @@ throwError = function (err) {
 
 const clearImage = filePath => {
     filePath = path.join(__dirname, '..', filePath);
+    console.log(filePath);
     fs.unlink(filePath, err => console.log(err));
-};
+}
